@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Local CRM Viewer</title>
+</head>
+<body>
+<h2>Open your CRM files</h2>
+<input type="file" id="fileInput" webkitdirectory directory multiple />
+<div id="preview"></div>
+
+<script>
+const input = document.getElementById('fileInput');
+const preview = document.getElementById('preview');
+
+input.addEventListener('change', (event) => {
+  preview.innerHTML = '';
+  const files = event.target.files;
+  for (let file of files) {
+    if (file.name.endsWith('.html')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const frame = document.createElement('iframe');
+        frame.srcdoc = e.target.result;
+        frame.style.width = '100%';
+        frame.style.height = '500px';
+        frame.style.border = '1px solid #ccc';
+        preview.appendChild(frame);
+      };
+      reader.readAsText(file);
+    }
+  }
+});
+</script>
+</body>
+</html>
