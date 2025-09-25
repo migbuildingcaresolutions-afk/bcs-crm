@@ -59,4 +59,512 @@ input, select, textarea{padding:5px;margin:2px;border-radius:3px;}
 </div>
 </div>
 <!-- CUSTOMERS -->
+<div id="customers" class="tab-content">
+<button onclick="showAddCustomerModal()">Add Customer</button>
+<input type="text" placeholder="Search Customer" oninput="searchCustomers(this.value)">
+<table id="customersTable">
+<thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Notes</th><th>Actions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- CUSTOMER MODAL -->
+<div id="customerModal" class="modal">
+<div class="modal-content">
+<span class="close-btn" onclick="closeModal()">&times;</span>
+<h3 id="customerModalTitle">Add Customer</h3>
+<form id="customerForm">
+<label>Name: <input type="text" id="customerName" required></label><br>
+<label>Phone: <input type="text" id="customerPhone"></label><br>
+<label>Email: <input type="email" id="customerEmail"></label><br>
+<label>Address: <input type="text" id="customerAddress"></label><br>
+<label>Notes: <textarea id="customerNotes"></textarea></label><br>
+<button type="submit">Save Customer</button>
+</form>
+</div>
+</div>
+<!-- ESTIMATES -->
+<div id="estimates" class="tab-content">
+<h3>Create Estimate</h3>
+<label>Customer: <select id="estimateCustomer"></select></label><br>
+<div>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="painting"> Painting</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="drywall"> Drywall</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="carpentry"> Carpentry</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="plumbing"> Plumbing</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="electrical"> Electrical</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="stucco"> Stucco</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="windows"> Windows/Doors</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="cabinets"> Cabinets</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="insulation"> Insulation</label>
+<label><input type="checkbox" onchange="toggleTradeSection(this)" data-trade="water"> Water Remediation</label>
+</div>
+<div id="tradeSections"></div>
+<button onclick="updateEstimate()">Calculate Estimate</button>
+<div id="estimateBreakdown"></div>
+<button onclick="convertToQuote()">Convert to Quote</button>
+</div>
+
+<script>
+// Trade sections visibility
+function toggleTradeSection(checkbox){
+  let trade = checkbox.dataset.trade;
+  let div = document.getElementById('trade_'+trade);
+  if(checkbox.checked){
+    if(!div){
+      div = document.createElement('div');
+      div.className='trade-section';
+      div.id='trade_'+trade;
+      div.innerHTML = `<h4>${trade.charAt(0).toUpperCase()+trade.slice(1)}</h4>
+      Qty: <input type="number" id="${trade}_qty" value="0"><br>
+      Notes: <input type="text" id="${trade}_notes">`;
+      document.getElementById('tradeSections').appendChild(div);
+    }
+    div.style.display='block';
+  } else {
+    if(div) div.style.display='none';
+  }
+}
+
+// Update estimate
+function updateEstimate(){
+  let customerId = document.getElementById('estimateCustomer').value;
+  if(!customerId){ alert('Select customer'); return; }
+  let total = 0;
+  let breakdown = '';
+  for(let trade in pricingData){
+    let qtyEl = document.getElementById(trade+'_qty');
+    if(qtyEl && qtyEl.parentElement.style.display!='none'){
+      let qty = parseFloat(qtyEl.value) || 0;
+      let price = pricingData[trade]*qty;
+      total += price;
+      breakdown += `${trade.charAt(0).toUpperCase()+trade.slice(1)}: $${price.toFixed(2)}<br>`;
+    }
+  }
+  let tax = total*TAX_RATE;
+  let labor = LABOR_RATE;
+  let grandTotal = total + tax + labor;
+  breakdown += `Subtotal: $${total.toFixed(2)}<br>Tax: $${tax.toFixed(2)}<br>Labor: $${labor.toFixed(2)}<br><b>Total: $${grandTotal.toFixed(2)}</b>`;
+  document.getElementById('estimateBreakdown').innerHTML = breakdown;
+}
+
+// Convert estimate to quote
+function convertToQuote(){
+  let customerId = document.getElementById('estimateCustomer').value;
+  if(!customerId){ alert('Select customer'); return; }
+  let total = 0;
+  for(let trade in pricingData){
+    let qtyEl = document.getElementById(trade+'_qty');
+    if(qtyEl && qtyEl.parentElement.style.display!='none'){
+      let qty = parseFloat(qtyEl.value)||0;
+      total += pricingData[trade]*qty;
+    }
+  }
+  let tax = total*TAX_RATE;
+  let labor = LABOR_RATE;
+  let grandTotal = total + tax + labor;
+  let quote = {
+    quoteNumber: nextQuoteNumber++,
+    customerId: customerId,
+    total: grandTotal,
+    status: 'Draft',
+    signature: null
+  };
+  quotes.push(quote);
+  localStorage.setItem('quotes', JSON.stringify(quotes));
+  localStorage.setItem('nextQuoteNumber', nextQuoteNumber);
+  alert(`Quote #${quote.quoteNumber} created`);
+  updateDashboard();
+  loadQuotesTable();
+}
+</script>
+<!-- QUOTES -->
+<div id="quotes" class="tab-content">
+<h3>Quotes</h3>
+<table id="quotesTable">
+<thead><tr><th>Quote #</th><th>Customer</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- INVOICES -->
+<div id="invoices" class="tab-content">
+<h3>Invoices</h3>
+<table id="invoicesTable">
+<thead><tr><th>Invoice #</th><th>Customer</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- WORK ORDERS -->
+<div id="workorders" class="tab-content">
+<h3>Work Orders</h3>
+<table id="workOrdersTable">
+<thead><tr><th>WO #</th><th>Customer</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<script>
+// Utility function to get customer name
+function getCustomerName(id){
+  let cust = customers.find(c=>c.id==id);
+  return cust?cust.name:'Unknown';
+}
+
+// Load quotes table
+function loadQuotesTable(){
+  let tbody = document.getElementById('quotesTable').querySelector('tbody');
+  tbody.innerHTML='';
+  quotes.forEach(q=>{
+    let tr = document.createElement('tr');
+    tr.innerHTML=`<td>${q.quoteNumber}</td><td>${getCustomerName(q.customerId)}</td><td>$${q.total.toFixed(2)}</td><td>${q.status}</td>
+    <td>
+      <button onclick="approveQuote(${q.quoteNumber})">Approve</button>
+      <button onclick="convertQuoteToInvoice(${q.quoteNumber})">Invoice</button>
+    </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Approve quote (signature modal)
+function approveQuote(quoteNumber){
+  let quote = quotes.find(q=>q.quoteNumber==quoteNumber);
+  if(!quote) return;
+  currentSignatureTarget = {type:'quote', id:quoteNumber};
+  openSignatureModal();
+}
+
+// Convert quote to invoice
+function convertQuoteToInvoice(quoteNumber){
+  let quote = quotes.find(q=>q.quoteNumber==quoteNumber);
+  if(!quote) return;
+  let invoice = {
+    invoiceNumber: nextInvoiceNumber++,
+    customerId: quote.customerId,
+    total: quote.total,
+    status:'Unpaid',
+    signature: null
+  };
+  invoices.push(invoice);
+  localStorage.setItem('invoices', JSON.stringify(invoices));
+  localStorage.setItem('nextInvoiceNumber', nextInvoiceNumber);
+  quote.status='Approved';
+  localStorage.setItem('quotes', JSON.stringify(quotes));
+  alert(`Invoice #${invoice.invoiceNumber} created from Quote #${quoteNumber}`);
+  loadQuotesTable();
+  loadInvoicesTable();
+  updateDashboard();
+}
+
+// Load invoices table
+function loadInvoicesTable(){
+  let tbody = document.getElementById('invoicesTable').querySelector('tbody');
+  tbody.innerHTML='';
+  invoices.forEach(i=>{
+    let tr = document.createElement('tr');
+    tr.innerHTML=`<td>${i.invoiceNumber}</td><td>${getCustomerName(i.customerId)}</td><td>$${i.total.toFixed(2)}</td><td>${i.status}</td>
+    <td>
+      <button onclick="markInvoicePaid(${i.invoiceNumber})">Mark Paid</button>
+    </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Mark invoice as paid
+function markInvoicePaid(invoiceNumber){
+  let inv = invoices.find(i=>i.invoiceNumber==invoiceNumber);
+  if(!inv) return;
+  inv.status='Paid';
+  localStorage.setItem('invoices', JSON.stringify(invoices));
+  loadInvoicesTable();
+  updateDashboard();
+}
+
+// Load work orders table
+function loadWorkOrdersTable(){
+  let tbody = document.getElementById('workOrdersTable').querySelector('tbody');
+  tbody.innerHTML='';
+  workOrders.forEach(w=>{
+    let tr = document.createElement('tr');
+    tr.innerHTML=`<td>${w.woNumber}</td><td>${getCustomerName(w.customerId)}</td><td>${w.status}</td>
+    <td>
+      <button onclick="approveWorkOrder(${w.woNumber})">Approve</button>
+    </td>`;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+<!-- CALENDAR -->
+<div id="calendar" class="tab-content">
+<h3>Calendar</h3>
+<p>Month/Day view placeholder (will show work orders and appointments)</p>
+</div>
+
+<!-- EXPENSES -->
+<div id="expenses" class="tab-content">
+<h3>Expenses</h3>
+<button onclick="showAddExpenseModal()">Add Expense</button>
+<table id="expensesTable">
+<thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th>Amount</th><th>Notes</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- EQUIPMENT -->
+<div id="equipment" class="tab-content">
+<h3>Equipment</h3>
+<button onclick="showAddEquipmentModal()">Add Equipment</button>
+<table id="equipmentTable">
+<thead><tr><th>Name</th><th>Location</th><th>Status</th><th>Last Serviced</th><th>Actions</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- SIGNATURE MODAL -->
+<div id="signatureModal" class="modal">
+<div class="modal-content">
+<span class="close-btn" onclick="closeSignatureModal()">&times;</span>
+<h3>Sign / Approve</h3>
+<canvas id="signaturePad" class="signature-pad"></canvas><br>
+<button onclick="saveSignature()">Save Signature</button>
+<button onclick="clearSignature()">Clear</button>
+</div>
+</div>
+
+<script>
+// ====== DATA ======
+let currentSignatureTarget = null; // {type:'quote'/'invoice'/'workorder', id: number}
+
+// ===== MODALS ======
+function showAddCustomerModal(){ document.getElementById('customerModal').style.display='block'; }
+function closeModal(){ document.getElementById('customerModal').style.display='none'; }
+
+// Signature modal
+function openSignatureModal(){ document.getElementById('signatureModal').style.display='block'; initializeSignaturePad(); }
+function closeSignatureModal(){ document.getElementById('signatureModal').style.display='none'; }
+
+// Signature pad
+let canvas, ctx, drawing=false;
+function initializeSignaturePad(){
+  canvas=document.getElementById('signaturePad');
+  ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  canvas.onmousedown=e=>drawing=true;
+  canvas.onmouseup=e=>drawing=false;
+  canvas.onmousemove=e=>{
+    if(drawing){
+      ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.strokeStyle='black';
+      ctx.lineTo(e.offsetX,e.offsetY); ctx.stroke(); ctx.beginPath();
+      ctx.moveTo(e.offsetX,e.offsetY);
+    }
+  };
+}
+function saveSignature(){
+  let dataURL=canvas.toDataURL();
+  if(currentSignatureTarget){
+    if(currentSignatureTarget.type==='quote'){
+      let q=quotes.find(x=>x.quoteNumber==currentSignatureTarget.id);
+      if(q){ q.signature=dataURL; q.status='Approved'; localStorage.setItem('quotes',JSON.stringify(quotes)); loadQuotesTable(); }
+    } else if(currentSignatureTarget.type==='invoice'){
+      let i=invoices.find(x=>x.invoiceNumber==currentSignatureTarget.id);
+      if(i){ i.signature=dataURL; localStorage.setItem('invoices',JSON.stringify(invoices)); loadInvoicesTable(); }
+    } else if(currentSignatureTarget.type==='workorder'){
+      let w=workOrders.find(x=>x.woNumber==currentSignatureTarget.id);
+      if(w){ w.signature=dataURL; w.status='Approved'; localStorage.setItem('workOrders',JSON.stringify(workOrders)); loadWorkOrdersTable(); }
+    }
+  }
+  closeSignatureModal();
+}
+function clearSignature(){ ctx.clearRect(0,0,canvas.width,canvas.height); }
+
+// ===== EXPENSES ======
+function showAddExpenseModal(){
+  let desc = prompt('Enter expense description:'); if(!desc) return;
+  let amount = parseFloat(prompt('Amount:')); if(isNaN(amount)) return;
+  let date = new Date().toLocaleDateString();
+  let exp = {date:date, category:'General', vendor:'', amount:amount, notes:desc};
+  expenses.push(exp); localStorage.setItem('expenses',JSON.stringify(expenses)); loadExpensesTable();
+}
+function loadExpensesTable(){
+  let tbody=document.getElementById('expensesTable').querySelector('tbody'); tbody.innerHTML='';
+  expenses.forEach(e=>{
+    let tr=document.createElement('tr');
+    tr.innerHTML=`<td>${e.date}</td><td>${e.category}</td><td>${e.vendor}</td><td>$${e.amount.toFixed(2)}</td><td>${e.notes}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ===== EQUIPMENT ======
+function showAddEquipmentModal(){
+  let name = prompt('Equipment name:'); if(!name) return;
+  let eq = {name:name, location:'Storage', status:'Available', lastServiced:new Date().toLocaleDateString()};
+  equipment.push(eq); localStorage.setItem('equipment',JSON.stringify(equipment)); loadEquipmentTable();
+}
+function loadEquipmentTable(){
+  let tbody=document.getElementById('equipmentTable').querySelector('tbody'); tbody.innerHTML='';
+  equipment.forEach((e,i)=>{
+    let tr=document.createElement('tr');
+    tr.innerHTML=`<td>${e.name}</td><td>${e.location}</td><td>${e.status}</td><td>${e.lastServiced}</td>
+    <td><button onclick="removeEquipment(${i})">Remove</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function removeEquipment(idx){ equipment.splice(idx,1); localStorage.setItem('equipment',JSON.stringify(equipment)); loadEquipmentTable(); }
+
+// ===== DASHBOARD ======
+function updateDashboard(){
+  document.getElementById('cardCustomers').innerText='Customers: '+customers.length;
+  document.getElementById('cardQuotes').innerText='Open Quotes: '+quotes.filter(q=>q.status!=='Approved').length;
+  document.getElementById('cardInvoices').innerText='Pending Invoices: '+invoices.filter(i=>i.status!=='Paid').length;
+  document.getElementById('cardWorkOrders').innerText='Work Orders: '+workOrders.length;
+  let revenue = invoices.reduce((sum,i)=>sum+i.total,0);
+  document.getElementById('cardRevenue').innerText='Revenue This Month: $'+revenue.toFixed(2);
+  document.getElementById('cardPendingSignatures').innerText='Pending Approvals: '+quotes.filter(q=>!q.signature).length;
+  document.getElementById('cardPendingPayments').innerText='Pending Payments: '+invoices.filter(i=>i.status!=='Paid').length;
+}
+
+// ===== INITIAL LOAD ======
+updateDashboard();
+loadQuotesTable();
+loadInvoicesTable();
+loadWorkOrdersTable();
+loadExpensesTable();
+loadEquipmentTable();
+</script>
+</body>
+</html>
+<script>
+// Populate customer dropdown in Estimates tab
+function populateEstimateCustomers(){
+  let select = document.getElementById('estimateCustomer');
+  select.innerHTML='<option value="">--Select Customer--</option>';
+  customers.forEach(c=>{
+    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+  });
+}
+
+// Search/filter customers table
+function searchCustomers(query){
+  let tbody = document.getElementById('customersTable').querySelector('tbody');
+  tbody.innerHTML='';
+  customers.filter(c=>{
+    return c.name.toLowerCase().includes(query.toLowerCase()) ||
+           (c.phone && c.phone.includes(query)) ||
+           (c.email && c.email.toLowerCase().includes(query.toLowerCase()));
+  }).forEach(c=>{
+    let tr=document.createElement('tr');
+    tr.innerHTML=`<td>${c.name}</td><td>${c.phone||''}</td><td>${c.email||''}</td><td>${c.address||''}</td><td>${c.notes||''}</td>
+    <td><button onclick="editCustomer('${c.id}')">Edit</button> <button onclick="deleteCustomer('${c.id}')">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Add/Edit/Delete Customers
+document.getElementById('customerForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  let name = document.getElementById('customerName').value;
+  let phone = document.getElementById('customerPhone').value;
+  let email = document.getElementById('customerEmail').value;
+  let address = document.getElementById('customerAddress').value;
+  let notes = document.getElementById('customerNotes').value;
+  let id = document.getElementById('customerForm').dataset.editId || Date.now().toString();
+  let existing = customers.find(c=>c.id===id);
+  if(existing){
+    existing.name=name; existing.phone=phone; existing.email=email; existing.address=address; existing.notes=notes;
+  } else {
+    customers.push({id,name,phone,email,address,notes});
+  }
+  localStorage.setItem('customers', JSON.stringify(customers));
+  closeModal();
+  populateEstimateCustomers();
+  searchCustomers('');
+  updateDashboard();
+});
+
+// Edit Customer
+function editCustomer(id){
+  let c = customers.find(c=>c.id===id);
+  if(!c) return;
+  document.getElementById('customerForm').dataset.editId=id;
+  document.getElementById('customerName').value=c.name;
+  document.getElementById('customerPhone').value=c.phone||'';
+  document.getElementById('customerEmail').value=c.email||'';
+  document.getElementById('customerAddress').value=c.address||'';
+  document.getElementById('customerNotes').value=c.notes||'';
+  document.getElementById('customerModalTitle').innerText='Edit Customer';
+  showAddCustomerModal();
+}
+
+// Delete Customer
+function deleteCustomer(id){
+  if(confirm('Delete this customer?')){
+    customers = customers.filter(c=>c.id!==id);
+    localStorage.setItem('customers', JSON.stringify(customers));
+    populateEstimateCustomers();
+    searchCustomers('');
+    updateDashboard();
+  }
+}
+
+// Initial load
+populateEstimateCustomers();
+searchCustomers('');
+<script>
+// ===== CRM INITIALIZATION =====
+
+// Default empty arrays if nothing in LocalStorage
+let customers = JSON.parse(localStorage.getItem('customers')) || [];
+let quotes = JSON.parse(localStorage.getItem('quotes')) || [];
+let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+let workOrders = JSON.parse(localStorage.getItem('workOrders')) || [];
+let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+let equipment = JSON.parse(localStorage.getItem('equipment')) || [];
+
+// Auto-increment numbers
+let nextQuoteNumber = parseInt(localStorage.getItem('nextQuoteNumber')) || 1001;
+let nextInvoiceNumber = parseInt(localStorage.getItem('nextInvoiceNumber')) || 5001;
+
+// Tax and labor
+const TAX_RATE = 0.0775; // 7.75%
+const LABOR_RATE = 75; // $75/hr
+
+// Pricing data for trades
+const pricingData = {
+  painting:100,
+  drywall:120,
+  carpentry:150,
+  plumbing:200,
+  electrical:180,
+  stucco:130,
+  windows:250,
+  cabinets:300,
+  insulation:80,
+  water:400
+};
+
+// Show/hide tabs
+function showTab(tabId){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.nav-tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+}
+
+// Initial population
+function initializeCRM(){
+  populateEstimateCustomers();
+  searchCustomers('');
+  loadQuotesTable();
+  loadInvoicesTable();
+  loadWorkOrdersTable();
+  loadExpensesTable();
+  loadEquipmentTable();
+  updateDashboard();
+}
+
+// Run on page load
+window.onload = initializeCRM;
+</script>
 
